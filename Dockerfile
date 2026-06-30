@@ -28,9 +28,6 @@ RUN pip install --no-cache-dir uv && \
 # Copy remaining codebase
 COPY --chown=user . .
 
-# Train model during container build phase
-RUN python scripts/train.py
-
 # Switch to non-root user
 USER user
 
