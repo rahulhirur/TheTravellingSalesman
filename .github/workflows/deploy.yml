@@ -69,15 +69,7 @@ jobs:
           echo "Deploying Streamlit Frontend to HF Space: $HF_SPACE_FRONTEND..."
           git checkout -b temp-deploy-frontend
           cp frontend.Dockerfile Dockerfile
-          echo '---
-title: TSP Solver Playground
-emoji: 🗺️
-colorFrom: indigo
-colorTo: purple
-sdk: docker
-pinned: false
-app_port: 7860
----' > temp_readme.md
+          printf "%s\n" "---" "title: TSP Solver Playground" "emoji: 🗺️" "colorFrom: indigo" "colorTo: purple" "sdk: docker" "pinned: false" "app_port: 7860" "---" > temp_readme.md
           cat README.md >> temp_readme.md
           mv temp_readme.md README.md
           git add Dockerfile README.md
@@ -90,15 +82,7 @@ app_port: 7860
         if [ -n "$HF_SPACE_BACKEND" ]; then
           echo "Deploying FastAPI Backend to HF Space: $HF_SPACE_BACKEND..."
           git checkout -b temp-deploy-backend
-          echo '---
-title: TSP Solver API
-emoji: ⚙️
-colorFrom: blue
-colorTo: indigo
-sdk: docker
-pinned: false
-app_port: 7860
----' > temp_readme.md
+          printf "%s\n" "---" "title: TSP Solver API" "emoji: ⚙️" "colorFrom: blue" "colorTo: indigo" "sdk: docker" "pinned: false" "app_port: 7860" "---" > temp_readme.md
           cat README.md >> temp_readme.md
           mv temp_readme.md README.md
           git add README.md
