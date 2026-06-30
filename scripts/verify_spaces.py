@@ -15,14 +15,31 @@ def clean_space_id(raw_str):
         val = val.split("huggingface.co/")[-1]
     return val.strip("/")
 
+def print_space_logs(space, token, build_type="run"):
+    print(f"\n=== FETCHING LIVE LOGS FOR: {space} ({build_type.upper()}) ===")
+    try:
+        headers = {"Authorization": f"Bearer {token}"} if token else {}
+        url = f"https://huggingface.co/api/spaces/{space}/logs/{build_type}"
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            raw_content = resp.read().decode(errors="ignore")
+        
+        # Split and print last 100 lines
+        lines = raw_content.splitlines()
+        for line in lines[-100:]:
+            print(line)
+    except Exception as e:
+        print(f"Failed to retrieve Space logs: {e}")
+    print("=========================================\n")
+
 def test_inference(base_url):
     print(f"  Running Layer 3: End-to-End Inference Test...")
     solve_url = f"{base_url}/solve"
     
-    # 3-point dummy TSP problem
+    # 3-point dummy TSP problem matching SolveRequest schema
     payload = {
         "points": [[0.0, 0.0], [0.5, 0.5], [1.0, 1.0]],
-        "solver_name": "nearest_neighbor"
+        "solvers": ["nearest_neighbor"]
     }
     
     try:
@@ -40,11 +57,11 @@ def test_inference(base_url):
         with urllib.request.urlopen(req, timeout=20) as resp:
             resp_data = json.loads(resp.read().decode())
             
-        tour = resp_data.get("tour")
-        tour_length = resp_data.get("tour_length")
+        results = resp_data.get("results", {})
+        nn_result = results.get("nearest_neighbor")
         
-        if tour is not None and tour_length is not None:
-            print(f"  [SUCCESS] Inference Test passed! Solution found: length={tour_length}, tour={tour}")
+        if nn_result and "path" in nn_result and "distance" in nn_result:
+            print(f"  [SUCCESS] Inference Test passed! Solution found: {nn_result}")
             return True
         else:
             print(f"  [FAILURE] Inference Test returned invalid schema: {resp_data}")
@@ -71,7 +88,7 @@ def check_spaces():
         sys.exit(0)
         
     max_attempts = 20
-    check_interval = 15
+    check_interval = 7
     print(f"Monitoring Hugging Face Spaces: {spaces}")
     
     for space in spaces:
@@ -88,7 +105,14 @@ def check_spaces():
                 
                 runtime = data.get("runtime", {})
                 stage = runtime.get("stage", "UNKNOWN")
-                print(f"  Attempt {attempt}/{max_attempts} | Current Stage: {stage}")
+                sdk = runtime.get("sdk", "unknown-sdk")
+                hardware = runtime.get("hardware", "unknown-hardware")
+                
+                print(f"  Attempt {attempt}/{max_attempts} | Stage: {stage} | SDK: {sdk} | Hardware: {hardware}")
+                
+                info_msg = runtime.get("error_message")
+                if info_msg:
+                    print(f"  [HF Info/Error] {info_msg}")
                 
                 if stage == "RUNNING":
                     print(f"  [SUCCESS] Space {space} is running on Hugging Face!")
@@ -138,11 +162,12 @@ def check_spaces():
                         
                 elif stage in ["BUILD_ERROR", "RUNTIME_ERROR"]:
                     print(f"\n[FAILURE] Space {space} failed with stage: {stage}!")
-                    print(f"Please inspect the logs directly at: https://huggingface.co/spaces/{space}")
+                    log_type = "build" if stage == "BUILD_ERROR" else "run"
+                    print_space_logs(space, hf_token, log_type)
                     sys.exit(1)
                 elif stage == "PAUSED":
                     print(f"\n[WARNING] Space {space} is paused.")
-                    print(f"Please resume it at: https://huggingface.co/spaces/{space}")
+                    print_space_logs(space, hf_token, "run")
                     sys.exit(1)
                     
             except urllib.error.HTTPError as e:
@@ -157,7 +182,8 @@ def check_spaces():
             
         if not success:
             print(f"\n[TIMEOUT] Space {space} did not reach RUNNING stage in time.")
-            print(f"Please check status manually at: https://huggingface.co/spaces/{space}")
+            print_space_logs(space, hf_token, "build")
+            print_space_logs(space, hf_token, "run")
             sys.exit(1)
             
     print("\nAll Hugging Face Spaces deployed and running successfully!")

@@ -28,7 +28,11 @@ class SolverData(BaseModel):
 class SolveResponse(BaseModel):
     results: Dict[str, SolverData]
 
-# ----------------- ROUTING / ENDPOINTS -----------------
+@router.get("/")
+def read_root():
+    """Root endpoint for status check compliance."""
+    return {"message": "TSP Solver API is running", "status": "healthy"}
+
 @router.get("/health")
 def health():
     """Health check endpoint containing model loading states."""
