@@ -67,13 +67,48 @@ jobs:
         # Deploy Frontend Streamlit Space
         if [ -n "$HF_SPACE_FRONTEND" ]; then
           echo "Deploying Streamlit Frontend to HF Space: $HF_SPACE_FRONTEND..."
-          git push --force https://deployer:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE_FRONTEND main
+          git checkout -b temp-deploy-frontend
+          cp frontend.Dockerfile Dockerfile
+          cat << 'EOF' > temp_readme.md
+---
+title: TSP Solver Playground
+emoji: 🗺️
+colorFrom: indigo
+colorTo: purple
+sdk: docker
+pinned: false
+app_port: 7860
+---
+EOF
+          cat README.md >> temp_readme.md
+          mv temp_readme.md README.md
+          git add Dockerfile README.md
+          git commit -m "Deploy Streamlit Frontend"
+          git push --force https://deployer:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE_FRONTEND temp-deploy-frontend:main
+          git checkout main
         fi
         
         # Deploy Backend FastAPI Space
         if [ -n "$HF_SPACE_BACKEND" ]; then
           echo "Deploying FastAPI Backend to HF Space: $HF_SPACE_BACKEND..."
-          git push --force https://deployer:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE_BACKEND main
+          git checkout -b temp-deploy-backend
+          cat << 'EOF' > temp_readme.md
+---
+title: TSP Solver API
+emoji: ⚙️
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+pinned: false
+app_port: 7860
+---
+EOF
+          cat README.md >> temp_readme.md
+          mv temp_readme.md README.md
+          git add README.md
+          git commit -m "Deploy FastAPI Backend"
+          git push --force https://deployer:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE_BACKEND temp-deploy-backend:main
+          git checkout main
         fi
 
   # Job 3: Verify Hugging Face Spaces are successfully running
@@ -99,12 +134,26 @@ jobs:
         import urllib.request
         import json
         
+        def clean_space_id(raw_str):
+            if not raw_str:
+                return None
+            val = raw_str.strip()
+            if "spaces/" in val:
+                val = val.split("spaces/")[-1]
+            elif "huggingface.co/" in val:
+                val = val.split("huggingface.co/")[-1]
+            return val.strip("/")
+            
         hf_token = os.environ.get("HF_TOKEN")
         spaces = []
-        if os.environ.get("HF_SPACE_FRONTEND"):
-            spaces.append(os.environ["HF_SPACE_FRONTEND"])
-        if os.environ.get("HF_SPACE_BACKEND"):
-            spaces.append(os.environ["HF_SPACE_BACKEND"])
+        
+        frontend = clean_space_id(os.environ.get("HF_SPACE_FRONTEND"))
+        if frontend:
+            spaces.append(frontend)
+            
+        backend = clean_space_id(os.environ.get("HF_SPACE_BACKEND"))
+        if backend:
+            spaces.append(backend)
             
         if not spaces:
             print("No Hugging Face Spaces defined to check.")
@@ -119,11 +168,12 @@ jobs:
             req_url = f"https://huggingface.co/api/spaces/{space}"
             headers = {"Authorization": f"Bearer {hf_token}"} if hf_token else {}
             req = urllib.request.Request(req_url, headers=headers)
+            print(f"  [DEBUG] Querying API: {req_url}")
             
             success = False
             for attempt in range(1, max_attempts + 1):
                 try:
-                    with urllib.request.urlopen(req) as response:
+                    with urllib.request.urlopen(req, timeout=10) as response:
                         data = json.loads(response.read().decode())
                     
                     runtime = data.get("runtime", {})
