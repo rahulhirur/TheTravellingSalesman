@@ -43,8 +43,8 @@ jobs:
       run: |
         pytest tests/
 
-  # Job 2: Push code to Hugging Face Spaces
-  deploy:
+  # Job 2A: Push Streamlit Frontend to Hugging Face
+  deploy-frontend:
     needs: validate
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -55,45 +55,66 @@ jobs:
         fetch-depth: 0
         lfs: true
 
-    - name: Push to Hugging Face Spaces
+    - name: Push Frontend Code
       env:
         HF_TOKEN: ${{ secrets.HF_TOKEN }}
         HF_SPACE_FRONTEND: ${{ secrets.HF_SPACE_FRONTEND }}
-        HF_SPACE_BACKEND: ${{ secrets.HF_SPACE_BACKEND }}
       run: |
-        git config --global user.email "deployer@github.actions"
-        git config --global user.name "GitHub Actions CI/CD"
-        
-        # Deploy Frontend Streamlit Space
         if [ -n "$HF_SPACE_FRONTEND" ]; then
           echo "Deploying Streamlit Frontend to HF Space: $HF_SPACE_FRONTEND..."
+          git config --global user.email "deployer@github.actions"
+          git config --global user.name "GitHub Actions CI/CD"
+          
           git checkout -b temp-deploy-frontend
           cp frontend.Dockerfile Dockerfile
           printf "%s\n" "---" "title: TSP Solver Playground" "emoji: 🗺️" "colorFrom: indigo" "colorTo: purple" "sdk: docker" "pinned: false" "app_port: 7860" "---" > temp_readme.md
           cat README.md >> temp_readme.md
           mv temp_readme.md README.md
+          
           git add Dockerfile README.md
           git commit -m "Deploy Streamlit Frontend"
           git push --force https://deployer:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE_FRONTEND temp-deploy-frontend:main
-          git checkout main
+        else
+          echo "HF_SPACE_FRONTEND secret not set. Skipping."
         fi
-        
-        # Deploy Backend FastAPI Space
+
+  # Job 2B: Push FastAPI Backend to Hugging Face
+  deploy-backend:
+    needs: validate
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+        lfs: true
+
+    - name: Push Backend Code
+      env:
+        HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        HF_SPACE_BACKEND: ${{ secrets.HF_SPACE_BACKEND }}
+      run: |
         if [ -n "$HF_SPACE_BACKEND" ]; then
           echo "Deploying FastAPI Backend to HF Space: $HF_SPACE_BACKEND..."
+          git config --global user.email "deployer@github.actions"
+          git config --global user.name "GitHub Actions CI/CD"
+          
           git checkout -b temp-deploy-backend
           printf "%s\n" "---" "title: TSP Solver API" "emoji: ⚙️" "colorFrom: blue" "colorTo: indigo" "sdk: docker" "pinned: false" "app_port: 7860" "---" > temp_readme.md
           cat README.md >> temp_readme.md
           mv temp_readme.md README.md
+          
           git add README.md
           git commit -m "Deploy FastAPI Backend"
           git push --force https://deployer:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE_BACKEND temp-deploy-backend:main
-          git checkout main
+        else
+          echo "HF_SPACE_BACKEND secret not set. Skipping."
         fi
 
-  # Job 3: Verify Hugging Face Spaces are successfully running
-  verify:
-    needs: deploy
+  # Job 3A: Verify Streamlit Frontend Space status
+  verify-frontend:
+    needs: deploy-frontend
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
@@ -105,10 +126,30 @@ jobs:
       with:
         python-version: '3.10'
 
-    - name: Verify Hugging Face Spaces Deployment Status
+    - name: Verify Frontend Status
       env:
         HF_TOKEN: ${{ secrets.HF_TOKEN }}
         HF_SPACE_FRONTEND: ${{ secrets.HF_SPACE_FRONTEND }}
+      run: |
+        python scripts/verify_spaces.py
+
+  # Job 3B: Verify FastAPI Backend Space status
+  verify-backend:
+    needs: deploy-backend
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Verify Backend Status
+      env:
+        HF_TOKEN: ${{ secrets.HF_TOKEN }}
         HF_SPACE_BACKEND: ${{ secrets.HF_SPACE_BACKEND }}
       run: |
         python scripts/verify_spaces.py
