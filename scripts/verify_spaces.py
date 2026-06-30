@@ -88,7 +88,7 @@ def check_spaces():
         sys.exit(0)
         
     max_attempts = 20
-    check_interval = 7
+    check_interval = 15
     print(f"Monitoring Hugging Face Spaces: {spaces}")
     
     for space in spaces:
