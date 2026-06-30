@@ -1,0 +1,66 @@
+name: W&B Model Promotion to Hugging Face
+
+on:
+  repository_dispatch:
+    types: [ promote_model ]
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install Dependencies
+      run: |
+        pip install wandb huggingface_hub
+
+    - name: Download Artifact from W&B & Upload to HF
+      env:
+        WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
+        HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        HF_MODEL_REPO: ${{ secrets.HF_MODEL_REPO }}
+        WANDB_ARTIFACT_PATH: ${{ github.event.client_payload.artifact_path }}
+      run: |
+        python -c '
+        import os
+        import wandb
+        from huggingface_hub import HfApi
+        
+        # 1. Authenticate W&B
+        wandb.login(key=os.environ["WANDB_API_KEY"])
+        
+        # 2. Fetch and download W&B Model Artifact
+        artifact_path = os.environ["WANDB_ARTIFACT_PATH"]
+        print(f"Downloading artifact: {artifact_path}")
+        api = wandb.Api()
+        artifact = api.artifact(artifact_path)
+        datadir = artifact.download()
+        
+        # 3. Locate .pth file
+        pth_file = None
+        for f in os.listdir(datadir):
+            if f.endswith(".pth"):
+                pth_file = os.path.join(datadir, f)
+                break
+                
+        if pth_file:
+            # Standardize filename based on artifact metadata/name
+            target_name = "model_transformer_GA.pth" if "GA" in artifact_path else "model_transformer.pth"
+            hf_repo = os.environ["HF_MODEL_REPO"]
+            hf_token = os.environ["HF_TOKEN"]
+            
+            # 4. Upload to HF Model Hub
+            print(f"Uploading {pth_file} to private HF repo {hf_repo} as {target_name}...")
+            hf_api = HfApi(token=hf_token)
+            hf_api.upload_file(
+                path_or_fileobj=pth_file,
+                path_in_repo=target_name,
+                repo_id=hf_repo
+            )
+            print("Successfully promoted model to production HF Hub repository!")
+        else:
+            raise FileNotFoundError("No .pth weights file found in W&B model artifact.")
+        '

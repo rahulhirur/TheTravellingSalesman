@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traveling Salesman Problem Solver: Neural vs. Conventional Benchmarking</title>
+    <meta name="description" content="An interactive visualization and MLOps benchmarking platform comparing deep learning (Pointer Networks) against conventional TSP solvers like OR-Tools and Christofides.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="app-navbar">
+        <div class="logo">
+            <span class="logo-icon">☍</span>
+            <h1>TSP Solver MLOps Platform</h1>
+        </div>
+        <nav class="nav-tabs">
+            <button class="tab-btn active" data-tab="playground-tab">Solver Playground</button>
+            <button class="tab-btn" data-tab="mlops-tab">MLOps Dashboard</button>
+            <button class="tab-btn" data-tab="architecture-tab">Architecture Hub</button>
+            <button class="theme-toggle-btn" id="theme-toggle-btn" title="Toggle Light/Dark Theme">🌙</button>
+        </nav>
+    </header>
+
+    <div class="app-container">
+        <!-- 1. PLAYGROUND TAB PANEL -->
+        <div id="playground-tab" class="tab-panel active-panel">
+            <div class="playground-layout">
+                <!-- Sidebar Navigation / Control Panel -->
+                <aside class="control-panel">
+                    <section class="config-section">
+                        <h2>1. Backend API Configuration</h2>
+                        <div class="input-group">
+                            <label for="api-url-input">API Endpoint URL</label>
+                            <div class="url-input-wrapper">
+                                <input type="text" id="api-url-input" value="http://localhost:7860" placeholder="http://localhost:7860">
+                                <button id="api-test-btn" class="secondary-btn" title="Test connection">Test</button>
+                            </div>
+                        </div>
+                        <div class="connection-status-pill" id="connection-status">
+                            <span class="status-dot warning"></span>
+                            <span class="status-text">Checking server...</span>
+                        </div>
+                    </section>
+
+                    <section class="config-section">
+                        <h2>2. Graph Generator</h2>
+                        <div class="input-group">
+                            <div class="slider-header">
+                                <label for="cities-count-slider">Number of Cities (N)</label>
+                                <span id="cities-count-val">20</span>
+                            </div>
+                            <input type="range" id="cities-count-slider" min="5" max="100" value="20" step="1">
+                        </div>
+                        <div class="button-row">
+                            <button id="generate-random-btn" class="primary-btn">Generate Random</button>
+                            <button id="clear-canvas-btn" class="danger-btn">Clear Canvas</button>
+                        </div>
+                        <p class="hint-text">Or click directly on the canvas to manually place cities.</p>
+                    </section>
+
+                    <section class="config-section">
+                        <h2>3. Select Solvers</h2>
+                        <div class="solver-checklist">
+                            <label class="solver-checkbox-wrapper neural">
+                                <input type="checkbox" id="solver-neural-check" value="neural" checked>
+                                <span class="custom-checkbox"></span>
+                                <div class="solver-info">
+                                    <span class="solver-title">Neural Solver (Pointer Net)</span>
+                                    <span class="solver-desc">PyTorch custom Transformer network</span>
+                                </div>
+                            </label>
+
+                            <label class="solver-checkbox-wrapper ortools">
+                                <input type="checkbox" id="solver-ortools-check" value="or_tools" checked>
+                                <span class="custom-checkbox"></span>
+                                <div class="solver-info">
+                                    <span class="solver-title">Google OR-Tools</span>
+                                    <span class="solver-desc">Guided Local Search heuristics</span>
+                                </div>
+                            </label>
+
+                            <label class="solver-checkbox-wrapper christofides">
+                                <input type="checkbox" id="solver-christofides-check" value="christofides" checked>
+                                <span class="custom-checkbox"></span>
+                                <div class="solver-info">
+                                    <span class="solver-title">Christofides Approximation</span>
+                                    <span class="solver-desc">NetworkX 1.5x metric bound solver</span>
+                                </div>
+                            </label>
+
+                            <label class="solver-checkbox-wrapper greedy">
+                                <input type="checkbox" id="solver-greedy-check" value="nearest_neighbor" checked>
+                                <span class="custom-checkbox"></span>
+                                <div class="solver-info">
+                                    <span class="solver-title">Nearest Neighbor</span>
+                                    <span class="solver-desc">Simple greedy algorithmic baseline</span>
+                                </div>
+                            </label>
+
+                            <label class="solver-checkbox-wrapper exact" id="exact-solver-wrapper">
+                                <input type="checkbox" id="solver-exact-check" value="exact">
+                                <span class="custom-checkbox"></span>
+                                <div class="solver-info">
+                                    <span class="solver-title">Held-Karp Exact Solver</span>
+                                    <span class="solver-desc">True optimum (DP - Only N &le; 10)</span>
+                                </div>
+                            </label>
+                        </div>
+                    </section>
+
+                    <section class="config-section">
+                        <h2>4. Animation & Execution</h2>
+                        <div class="input-group">
+                            <div class="slider-header">
+                                <label for="animation-speed-slider">Animation Duration</label>
+                                <span id="animation-speed-val">1.5s</span>
+                            </div>
+                            <input type="range" id="animation-speed-slider" min="0" max="5000" value="1500" step="100">
+                        </div>
+                        <button id="solve-btn" class="solve-action-btn">Solve Traveling Salesman</button>
+                    </section>
+                </aside>
+
+                <!-- Main Display / Canvas & Results -->
+                <main class="display-area">
+                    <!-- Graph Visualizer Section -->
+                    <section class="visualization-panel glass-panel">
+                        <div class="panel-header">
+                            <h2>Interactive Route Visualizer</h2>
+                            <div class="canvas-controls">
+                                <button id="reset-view-btn" class="icon-btn" title="Reset view zoom/pan">⊙ Reset Zoom</button>
+                                <span class="node-counter"><strong id="active-node-count">0</strong> Cities Placed</span>
+                            </div>
+                        </div>
+                        <div class="canvas-wrapper">
+                            <canvas id="tsp-canvas"></canvas>
+                            <div class="canvas-instruction" id="canvas-prompt">
+                                <span class="pulse-icon">＋</span>
+                                <p>Click here to place city nodes, or select 'Generate Random' to begin.</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Real-time Benchmarking Metrics -->
+                    <section class="benchmarking-panel">
+                        <div class="table-container glass-panel">
+                            <div class="panel-header">
+                                <h2>Run Diagnostics</h2>
+                                <span class="db-status-pill" id="db-status">Run Not Logged</span>
+                            </div>
+                            <table class="metrics-table">
+                                <thead>
+                                    <tr>
+                                        <th>Solver</th>
+                                        <th>Path Distance</th>
+                                        <th>Latency (ms)</th>
+                                        <th>Accuracy Gap</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="metrics-table-body">
+                                    <tr class="placeholder-row">
+                                        <td colspan="5">Solve the TSP to see benchmarking diagnostics.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="charts-row">
+                            <div class="chart-container glass-panel">
+                                <h3>Path Distance (Shorter is Better)</h3>
+                                <div class="bar-chart" id="distance-chart">
+                                    <div class="chart-placeholder">Solve to generate comparative distance metrics.</div>
+                                </div>
+                            </div>
+
+                            <div class="chart-container glass-panel">
+                                <h3>Computation Latency (Faster is Better)</h3>
+                                <div class="bar-chart" id="latency-chart">
+                                    <div class="chart-placeholder">Solve to generate comparative latency metrics.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </main>
+            </div>
+        </div>
+
+        <!-- 2. MLOPS DASHBOARD TAB PANEL -->
+        <div id="mlops-tab" class="tab-panel">
+            <div class="mlops-layout">
+                <!-- System Health & Overview -->
+                <section class="mlops-section glass-panel">
+                    <div class="panel-header">
+                        <h2>System Health & Aggregates</h2>
+                        <button id="refresh-mlops-btn" class="secondary-btn">↻ Refresh Stats</button>
+                    </div>
+                    <div class="mlops-grid-2col">
+                        <div class="info-card">
+                            <h4>Service Connection</h4>
+                            <div class="info-row"><span>API Status</span><span id="mlops-backend-status" class="badge danger">Offline</span></div>
+                            <div class="info-row"><span>Database Connected</span><span id="mlops-db-status" class="badge">None</span></div>
+                            <div class="info-row"><span>Neural Model Loaded</span><span id="mlops-model-status" class="badge">No</span></div>
+                        </div>
+                        <div class="info-card">
+                            <h4>Historical Averages</h4>
+                            <div id="historical-aggregates-container">
+                                <div class="chart-placeholder">No aggregates fetched. Connect API and refresh.</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Active Learning & Retraining Center -->
+                <section class="mlops-section glass-panel">
+                    <div class="panel-header">
+                        <h2>Active Learning & Retraining Center</h2>
+                    </div>
+                    <div class="mlops-grid-2col">
+                        <!-- Telemetry Dataset Stats -->
+                        <div class="info-card">
+                            <h4>Telemetry Data Collection</h4>
+                            <p class="section-desc">Production coordinates submitted by users are logged in the database to train future iterations.</p>
+                            <div class="stats-counter-wrapper">
+                                <span class="stats-label">Active Learning Pool Size</span>
+                                <span id="telemetry-count-val" class="stats-number">0</span>
+                                <span class="stats-unit">coordinate sets collected</span>
+                            </div>
+                            <div class="button-row" style="margin-top: 1.5rem;">
+                                <button id="download-dataset-btn" class="secondary-btn" disabled>↓ Download Labeled Dataset</button>
+                            </div>
+                        </div>
+
+                        <!-- Retrain Control Center -->
+                        <div class="info-card">
+                            <h4>Model Retraining Center</h4>
+                            <p class="section-desc">Run training locally. Updates weights on the backend server after training completes.</p>
+                            <div class="retrain-status-card">
+                                <div class="info-row"><span>Status</span><span id="retrain-status-text" class="badge badge-idle">Idle</span></div>
+                                <div id="retrain-progress-wrapper" class="progress-bar-container" style="display: none;">
+                                    <div class="progress-bar-track">
+                                        <div id="retrain-progress-bar" class="progress-bar-fill" style="width: 0%;"></div>
+                                    </div>
+                                    <span class="progress-percent">Retraining Model (Subprocess Running)...</span>
+                                </div>
+                            </div>
+                            <div class="button-row" style="margin-top: 1.5rem;">
+                                <button id="trigger-retrain-btn" class="primary-btn solve-action-btn">Run Model Retraining</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Live Retraining Console Log Output -->
+                    <div class="console-log-card" style="margin-top: 1.5rem;">
+                        <h4>Retraining Execution Output</h4>
+                        <pre id="retrain-console-log" class="console-terminal">Terminal output is empty. Click 'Run Model Retraining' to begin.</pre>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <!-- 3. ARCHITECTURE HUB TAB PANEL -->
+        <div id="architecture-tab" class="tab-panel">
+            <div class="architecture-layout">
+                <div class="architecture-grid">
+                    <!-- Left: Technical Overview -->
+                    <section class="glass-panel text-content-panel">
+                        <h2>TSP Solver MLOps Platform: Architectural Design</h2>
+                        <p>This application contrasts conventional graph heuristics against a sequence-to-sequence neural model to solve the 2D Traveling Salesman Problem.</p>
+
+                        <hr class="section-divider">
+
+                        <h3>1. Neural Network Architecture</h3>
+                        <p>The neural solver uses a <strong>Pointer Network</strong> model in PyTorch. Key characteristics:</p>
+                        <ul>
+                            <li><strong>Input Representation</strong>: City nodes are represented as 2D coordinate vectors $(x, y) \in [0, 1]^2$. They are projected into a 128-dimensional hidden space using a Linear node embedding.</li>
+                            <li><strong>Transformer Encoder</strong>: A 3-layer Transformer Encoder processes the sequence of embedded coordinates, computing multi-head self-attention to capture spatial context and global structure.</li>
+                            <li><strong>Pointer Decoder</strong>: Generates the route path. At each step, a query vector (concatenating the current node, start node, and global average embedding) is projected against the encoder's outputs. Softmax scores pointing to unvisited nodes dictate the next city to visit.</li>
+                            <li><strong>Loss Function</strong>: Categorical Negative Log-Likelihood (NLL) loss. The network is trained with Teacher Forcing using paths solved by Google OR-Tools.</li>
+                        </ul>
+
+                        <hr class="section-divider">
+
+                        <h3>2. Conventional Solvers</h3>
+                        <ul>
+                            <li><strong>Google OR-Tools</strong>: Uses Guided Local Search (GLS) meta-heuristics to find high-quality solutions, acting as the ground-truth trainer.</li>
+                            <li><strong>Christofides Algorithm</strong>: Constructs a minimum spanning tree, finds minimum weight perfect matchings on odd vertices, constructs a Eulerian tour, and shortcuts it. Guarantees a path length within 1.5x of the true optimum.</li>
+                            <li><strong>Nearest Neighbor</strong>: A greedy heuristic. Starts at city 0, iteratively jumps to the closest unvisited city, and returns to 0.</li>
+                            <li><strong>Held-Karp Exact Solver</strong>: A dynamic programming algorithm to find the absolute mathematical shortest path. Runs in $O(2^N N^2)$ complexity, limited to $N \le 10$ to prevent browser crashes.</li>
+                        </ul>
+
+                        <hr class="section-divider">
+
+                        <h3>3. Closed-Loop Telemetry & MLOps</h3>
+                        <p>Production runs logged to MongoDB Atlas/SQLite collect coordinate structures. The <strong>retraining loop</strong> automatically takes logged production data, retrains the Pointer Network, and reloads the serving weights to iteratively minimize the accuracy gap.</p>
+                    </section>
+
+                    <!-- Right: Model Visualizer -->
+                    <section class="glass-panel visualizer-panel">
+                        <div class="panel-header">
+                            <h2>Neural Model Architecture Explorer</h2>
+                            <div class="model-toggle-buttons">
+                                <button class="model-toggle-btn active" data-model="pointer">PointerNetwork</button>
+                                <button class="model-toggle-btn" data-model="transformer">TSP_Transformer (Notebook)</button>
+                            </div>
+                        </div>
+                        <div class="architecture-visual-container">
+                            <div id="architecture-diagram-wrapper"></div>
+                            
+                            <div class="layer-details-card" id="layer-details-box">
+                                <h4 id="layer-title">Layer Inspector</h4>
+                                <p id="layer-desc">Click on any layer/operation block in the diagram to inspect inputs, outputs, mathematical operations, and features.</p>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
