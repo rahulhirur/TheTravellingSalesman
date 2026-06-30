@@ -124,6 +124,26 @@ jobs:
                 val = val.split("huggingface.co/")[-1]
             return val.strip("/")
             
+        def print_space_logs(space, token):
+            print(f"\n=== FETCHING LIVE LOGS FOR: {space} ===")
+            try:
+                headers = {"Authorization": f"Bearer {token}"} if token else {}
+                url = f"https://huggingface.co/api/spaces/{space}/logs"
+                req = urllib.request.Request(url, headers=headers)
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    raw_content = resp.read().decode(errors="ignore")
+                try:
+                    logs_data = json.loads(raw_content)
+                    if isinstance(logs_data, dict):
+                        print(logs_data.get("logs", raw_content))
+                    else:
+                        print(logs_data)
+                except json.JSONDecodeError:
+                    print(raw_content)
+            except Exception as e:
+                print(f"Failed to retrieve Space logs: {e}")
+            print("=========================================\n")
+            
         hf_token = os.environ.get("HF_TOKEN")
         spaces = []
         
@@ -166,9 +186,11 @@ jobs:
                         break
                     elif stage in ["BUILD_ERROR", "RUNTIME_ERROR"]:
                         print(f"  [FAILURE] Space {space} failed with stage: {stage}")
+                        print_space_logs(space, hf_token)
                         exit(1)
                     elif stage == "PAUSED":
                         print(f"  [WARNING] Space {space} is paused.")
+                        print_space_logs(space, hf_token)
                         exit(1)
                 except Exception as e:
                     print(f"  Attempt {attempt}/{max_attempts} | Request failed: {e}")
@@ -177,6 +199,7 @@ jobs:
                 
             if not success:
                 print(f"  [TIMEOUT] Space {space} did not reach RUNNING stage.")
+                print_space_logs(space, hf_token)
                 exit(1)
                 
         print("\nAll Hugging Face Spaces deployed and running successfully!")
