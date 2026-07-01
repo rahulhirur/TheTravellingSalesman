@@ -23,7 +23,7 @@ COPY pyproject.toml ./
 
 # Install uv and project dependencies for frontend only
 RUN pip install --no-cache-dir uv && \
-    uv pip install --system ".[frontend]" --no-install-project
+    uv pip install --system -r pyproject.toml --extra frontend
 
 # Copy remaining codebase
 COPY --chown=user . .
