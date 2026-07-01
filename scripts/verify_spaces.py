@@ -21,18 +21,34 @@ def print_space_logs(space, token, build_type="run"):
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         url = f"https://huggingface.co/api/spaces/{space}/logs/{build_type}"
         req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            raw_content = resp.read().decode(errors="ignore")
         
-        # Split and print last 100 lines
-        lines = raw_content.splitlines()
+        # Read SSE stream line-by-line to prevent connection hanging
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            lines = []
+            for line in resp:
+                decoded = line.decode(errors="ignore").strip()
+                if decoded.startswith("data:"):
+                    try:
+                        # Extract SSE event content JSON
+                        data_json = json.loads(decoded[5:].strip())
+                        lines.append(data_json.get("data", ""))
+                    except Exception:
+                        lines.append(decoded)
+                elif decoded:
+                    lines.append(decoded)
+                
+                # Retrieve last 150 lines then close to avoid hanging
+                if len(lines) >= 150:
+                    break
+                    
+        # Print clean log lines
         for line in lines[-100:]:
-            print(line)
+            print(line, end="")
     except Exception as e:
         print(f"Failed to retrieve Space logs: {e}")
     print("=========================================\n")
 
-def test_inference(base_url):
+def test_inference(base_url, token):
     print(f"  Running Layer 3: End-to-End Inference Test...")
     solve_url = f"{base_url}/solve"
     
@@ -44,13 +60,17 @@ def test_inference(base_url):
     
     try:
         data = json.dumps(payload).encode("utf-8")
+        headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+        }
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+            
         req = urllib.request.Request(
             solve_url,
             data=data,
-            headers={
-                "Content-Type": "application/json",
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-            },
+            headers=headers,
             method="POST"
         )
         
@@ -128,12 +148,15 @@ def check_spaces():
                         is_backend = "api" in space_name
                         if is_backend:
                             health_url += "/health"
-                        
                         print(f"  Running Layer 2: HTTP Health check at: {health_url}...")
                         try:
+                            health_headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+                            if hf_token:
+                                health_headers["Authorization"] = f"Bearer {hf_token}"
+                                
                             http_req = urllib.request.Request(
                                 health_url, 
-                                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+                                headers=health_headers
                             )
                             with urllib.request.urlopen(http_req, timeout=15) as http_resp:
                                 code = http_resp.getcode()
@@ -151,7 +174,7 @@ def check_spaces():
                             
                         # Layer 3: Inference Test (Backend Only)
                         if is_backend:
-                            if not test_inference(base_url):
+                            if not test_inference(base_url, hf_token):
                                 sys.exit(1)
                                 
                         success = True
