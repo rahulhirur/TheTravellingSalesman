@@ -23,7 +23,7 @@ COPY pyproject.toml ./
 
 # Install uv and project dependencies for backend only
 RUN pip install --no-cache-dir uv && \
-    uv pip install --system ".[backend]"
+    uv pip install --system ".[backend]" --no-install-project
 
 # Copy remaining codebase
 COPY --chown=user . .
