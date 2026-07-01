@@ -41,3 +41,7 @@ dev = [
     "torchview>=0.2.7",
     "netron>=9.1.2",
 ]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
