@@ -5,7 +5,8 @@ FROM python:3.10-slim
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PORT=7860 \
-    HOME=/home/user
+    HOME=/home/user \
+    HF_HOME=/home/user/app/misc/.cache
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
