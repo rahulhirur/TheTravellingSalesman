@@ -48,12 +48,24 @@ with head_right:
     st.button(theme_label, on_click=toggle_theme, key="theme_toggle", use_container_width=True)
 
 # 4. API Connection Status Helper
-api_base_url = os.getenv("BACKEND_API_URL", "http://localhost:7860")
+api_base_url = os.getenv("BACKEND_API_URL")
+if not api_base_url:
+    space_id = os.getenv("SPACE_ID")
+    if space_id and "/" in space_id:
+        username = space_id.split("/")[0].lower().replace("_", "-")
+        api_base_url = f"https://{username}-thetravellingsalesman-api.hf.space"
+    else:
+        api_base_url = "http://localhost:7860"
+
+hf_token = os.getenv("HF_TOKEN")
 
 @st.cache_data(ttl=2)
 def check_api_health(url):
     try:
-        res = requests.get(f"{url}/health", timeout=1.5)
+        headers = {}
+        if hf_token:
+            headers["Authorization"] = f"Bearer {hf_token}"
+        res = requests.get(f"{url}/health", headers=headers, timeout=2.5)
         if res.status_code == 200:
             return True, res.json()
     except Exception:
@@ -200,10 +212,13 @@ with tab1:
                     # Request through Backend API only
                     try:
                         points_norm = (coords_scaled / 1000.0).tolist()
+                        headers = {}
+                        if hf_token:
+                            headers["Authorization"] = f"Bearer {hf_token}"
                         res = requests.post(f"{api_base_url}/solve", json={
                             "points": points_norm,
                             "solvers": selected_solvers
-                        })
+                        }, headers=headers)
                         if res.status_code == 200:
                             api_results = res.json()["results"]
                             for k, v in api_results.items():
