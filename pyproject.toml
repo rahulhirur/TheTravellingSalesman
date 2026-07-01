@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "tsp-solver"
 version = "0.1.0"
@@ -5,32 +9,35 @@ description = "A benchmarking platform for Neural vs. Conventional TSP solvers"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "pandas>=2.3.3",
+    "numpy",
+    "networkx",
+    "graphviz>=0.21",
+]
+
+[project.optional-dependencies]
+frontend = [
+    "streamlit>=1.58.0",
+    "plotly>=6.8.0",
+]
+backend = [
     "fastapi",
     "uvicorn",
     "pydantic",
     "scipy",
-    "networkx",
     "torch",
     "ortools",
-    "pymongo",
-    "mlflow",
     "huggingface-hub>=1.21.0",
-    "streamlit>=1.58.0",
-    "plotly>=6.8.0",
-    "pandas>=2.3.3",
-    "netron>=9.1.2",
-    "onnxscript>=0.7.0",
-    "onnx>=1.22.0",
-    "torchview>=0.2.7",
-    "graphviz>=0.21",
     "transformers>=5.12.1",
-    "ipywidgets>=8.1.8",
-    "jupyter>=1.1.1",
     "wandb",
 ]
-
-[dependency-groups]
 dev = [
     "pytest",
-    "httpx"
+    "httpx",
+    "jupyter>=1.1.1",
+    "ipywidgets>=8.1.8",
+    "onnx>=1.22.0",
+    "onnxscript>=0.7.0",
+    "torchview>=0.2.7",
+    "netron>=9.1.2",
 ]
