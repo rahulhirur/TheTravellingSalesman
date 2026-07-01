@@ -59,11 +59,13 @@ def get_backend_datasets():
                 dest_path = os.path.join(misc_dir, f)
                 if not os.path.exists(dest_path):
                     print(f"Downloading dataset {f} from HF Repository...")
+                    cache_dir = os.path.join(misc_dir, ".cache")
                     hf_hub_download(
                         repo_id=hf_repo,
                         filename=f,
                         token=hf_token,
-                        local_dir=misc_dir
+                        local_dir=misc_dir,
+                        cache_dir=cache_dir
                     )
                     if f not in local_files:
                         local_files.append(f)

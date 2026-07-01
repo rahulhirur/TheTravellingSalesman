@@ -96,11 +96,13 @@ def get_notebook_model(use_ga=False):
             try:
                 from huggingface_hub import hf_hub_download
                 print(f"Downloading {weights_filename} from HF Repo {hf_repo}...")
+                cache_dir = os.path.join(parent_dir, "misc", ".cache")
                 downloaded_path = hf_hub_download(
                     repo_id=hf_repo,
                     filename=weights_filename,
                     token=hf_token,
-                    local_dir=os.path.join(parent_dir, "misc")
+                    local_dir=os.path.join(parent_dir, "misc"),
+                    cache_dir=cache_dir
                 )
                 if downloaded_path and os.path.exists(downloaded_path):
                     weights_path = downloaded_path
