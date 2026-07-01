@@ -34,7 +34,8 @@ if "results" not in st.session_state:
 
 # 3. App Header
 inject_custom_css(False)
-render_app_header(False, "#71717a")
+text_muted = "#71717a"
+render_app_header(False, text_muted)
 
 # 4. API Connection Status Helper
 api_base_url = os.getenv("BACKEND_API_URL")
