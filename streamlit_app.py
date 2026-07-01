@@ -32,20 +32,9 @@ if "cities" not in st.session_state:
 if "results" not in st.session_state:
     st.session_state.results = {}
 
-def toggle_theme():
-    st.session_state.theme = "light" if st.session_state.theme == "dark" else "dark"
-
-IS_DARK = st.session_state.theme == "dark"
-inject_custom_css(IS_DARK)
-
-# 3. App Header & Theme Toggle
-head_left, head_right = st.columns([10, 2])
-with head_left:
-    text_muted = "#9aa2b1" if IS_DARK else "#71717a"
-    render_app_header(IS_DARK, text_muted)
-with head_right:
-    theme_label = "☀️ Light Mode" if IS_DARK else "🌙 Dark Mode"
-    st.button(theme_label, on_click=toggle_theme, key="theme_toggle", use_container_width=True)
+# 3. App Header
+inject_custom_css(False)
+render_app_header(False, "#71717a")
 
 # 4. API Connection Status Helper
 api_base_url = os.getenv("BACKEND_API_URL")
@@ -90,7 +79,7 @@ with tab1:
             # API Connection
             st.markdown("**Backend Service Status**")
             if api_online:
-                st.markdown(f'<span class="status-badge status-online">Connected: {health_data.get("database_type", "SQLite").upper()}</span>', unsafe_allow_html=True)
+                st.markdown('<span class="status-badge status-online">Online</span>', unsafe_allow_html=True)
             else:
                 st.markdown('<span class="status-badge status-offline">Offline: Waking Server...</span>', unsafe_allow_html=True)
             
@@ -120,47 +109,57 @@ with tab1:
                         st.session_state.results = {}
                         st.rerun()
             else:
-                data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "misc", "data")
-                if os.path.exists(data_dir):
-                    pkl_files = [f for f in os.listdir(data_dir) if f.endswith(".pkl")]
-                    if pkl_files:
-                        selected_file = st.selectbox("Select .pkl dataset file", pkl_files)
-                        file_path = os.path.join(data_dir, selected_file)
-                        
-                        try:
-                            # Load and display dataset details
-                            x_lst, y_lst = load_pkl_dataset(file_path)
-                            st.info(f"Loaded {len(x_lst)} samples from dataset.")
-                            sample_idx = st.number_input("Sample Index", min_value=0, max_value=len(x_lst)-1, value=0, step=1)
-                            
-                            # Update city coordinates
-                            coords_sample = x_lst[sample_idx]
-                            scaled_coords = np.array(coords_sample) * 1000.0
-                            st.session_state.cities = scaled_coords.tolist()
-                            
-                            # Cache the ground truth route
-                            gt_path = y_lst[sample_idx].tolist()
-                            if gt_path[-1] != gt_path[0]:
-                                gt_path.append(gt_path[0])
-                            
-                            # Compute ground truth distance
-                            dist = 0.0
-                            for i in range(len(gt_path) - 1):
-                                c1 = scaled_coords[gt_path[i]]
-                                c2 = scaled_coords[gt_path[i+1]]
-                                dist += math.hypot(c1[0] - c2[0], c1[1] - c2[1])
-                                
-                            st.session_state.results["ground_truth"] = {
-                                "path": gt_path,
-                                "distance": dist,
-                                "time_taken": 0.0
-                            }
-                        except Exception as e:
-                            st.error(f"Error reading dataset: {e}")
+                headers = {}
+                if hf_token:
+                    headers["Authorization"] = f"Bearer {hf_token}"
+                
+                try:
+                    res = requests.get(f"{api_base_url}/datasets", headers=headers, timeout=5.0)
+                    if res.status_code == 200:
+                        pkl_files = res.json().get("datasets", [])
                     else:
-                        st.warning("No valid non-empty .pkl files found in misc/data/.")
+                        pkl_files = []
+                except Exception:
+                    pkl_files = []
+                
+                if pkl_files:
+                    selected_file = st.selectbox("Select .pkl dataset file", pkl_files)
+                    sample_idx = st.number_input("Sample Index", min_value=0, max_value=999, value=0, step=1)
+                    
+                    if st.button("Load Dataset Sample", use_container_width=True, key="btn_load_sample") or "last_loaded_sample" not in st.session_state or st.session_state.last_loaded_sample != (selected_file, sample_idx):
+                        try:
+                            sample_res = requests.get(f"{api_base_url}/dataset/{selected_file}/{sample_idx}", headers=headers, timeout=5.0)
+                            if sample_res.status_code == 200:
+                                sample_data = sample_res.json()
+                                coords_sample = sample_data["points"]
+                                gt_path = sample_data["ground_truth"]
+                                
+                                scaled_coords = np.array(coords_sample) * 1000.0
+                                st.session_state.cities = scaled_coords.tolist()
+                                
+                                if len(gt_path) > 0 and gt_path[-1] != gt_path[0]:
+                                    gt_path.append(gt_path[0])
+                                    
+                                dist = 0.0
+                                for i in range(len(gt_path) - 1):
+                                    c1 = scaled_coords[gt_path[i]]
+                                    c2 = scaled_coords[gt_path[i+1]]
+                                    dist += math.hypot(c1[0] - c2[0], c1[1] - c2[1])
+                                    
+                                st.session_state.results["ground_truth"] = {
+                                    "path": gt_path,
+                                    "distance": dist,
+                                    "time_taken": 0.0
+                                }
+                                st.session_state.last_loaded_sample = (selected_file, sample_idx)
+                                st.success("Loaded dataset sample successfully!")
+                                st.rerun()
+                            else:
+                                st.error(f"Failed to load dataset sample: {sample_res.text}")
+                        except Exception as e:
+                            st.error(f"Error connecting to backend: {e}")
                 else:
-                    st.error("misc/data directory not found.")
+                    st.warning("No valid .pkl files found in Hugging Face Model Repository. Upload .pkl files to your model repo to see them here!")
                 
                 num_nodes = len(st.session_state.cities)
             
