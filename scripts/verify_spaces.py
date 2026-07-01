@@ -52,9 +52,9 @@ def test_inference(base_url, token):
     print(f"  Running Layer 3: End-to-End Inference Test...")
     solve_url = f"{base_url}/solve"
     
-    # 3-point dummy TSP problem matching SolveRequest schema
+    # 3-point dummy TSP problem matching SolveRequest schema (non-collinear to pass validator)
     payload = {
-        "points": [[0.0, 0.0], [0.5, 0.5], [1.0, 1.0]],
+        "points": [[0.0, 0.0], [0.5, 0.8], [1.0, 1.0]],
         "solvers": ["nearest_neighbor"]
     }
     
