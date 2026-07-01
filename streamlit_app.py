@@ -88,7 +88,7 @@ with tab1:
             st.markdown("**Data Source Selection**")
             data_source = st.selectbox(
                 "Input Data Source",
-                ["Random City Generator", "File Dataset (misc/data)"],
+                ["Random City Generator", "Hugging Face Dataset"],
                 key="data_source_select"
             )
             
